@@ -72,5 +72,33 @@ def update
 	end while true
 end
 
-update
+def generate_graphic
+	require 'RMagick'
+	canvas = Magick::Image.new(1000, 1000)
+	gc = Magick::Draw.new
+	gc.stroke('black')
 
+	min_lat = Entry.find(:first, :order=>'latitude ASC', :limit=>1).latitude
+	min_lon = Entry.find(:first, :order=>'longitude ASC', :limit=>1).longitude
+	max_lat = Entry.find(:first, :order=>'latitude DESC', :limit=>1).latitude
+	max_lon = Entry.find(:first, :order=>'longitude DESC', :limit=>1).longitude
+
+	lat_diff = max_lat - min_lat
+	lon_diff = max_lon - min_lon
+
+	max_diff = [lat_diff, lon_diff].max
+
+	factor = 1000 / max_diff
+
+	Entry.all.each do |point|
+		y = 1000 - (point.latitude - min_lat)*factor
+		x = (point.longitude - min_lon)*factor
+		gc.point(x, y)
+	end
+
+	gc.draw(canvas)
+	canvas.write(File.join(File.dirname(__FILE__), "image.png"))
+end
+
+update
+generate_graphic
