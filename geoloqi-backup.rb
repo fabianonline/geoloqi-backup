@@ -7,17 +7,17 @@ require 'geoloqi'
 require 'getopt/long'
 require 'RMagick'
 
-@config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
+$config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
 
 GEOLOQI_VERSION="0.2"
 
 ActiveRecord::Base.establish_connection(
     :adapter => 'mysql',
-    :host =>     @config['mysql']['host'],
-    :username => @config['mysql']['username'],
-    :password => @config['mysql']['password'],
-    :database => @config['mysql']['database'],
-    :encoding => @config['mysql']['encoding'])
+    :host =>     $config['mysql']['host'],
+    :username => $config['mysql']['username'],
+    :password => $config['mysql']['password'],
+    :database => $config['mysql']['database'],
+    :encoding => $config['mysql']['encoding'])
 
 class Entry < ActiveRecord::Base
 	validates_uniqueness_of :date
@@ -54,9 +54,9 @@ end
 def update
 	begin
 		start = Entry.find(:first, :order=>'date DESC').date.to_i rescue "0"
-		puts "Getting up to #{@config['geoloqi']['results_count']} entries starting at #{start}... "
-		response = Geoloqi.get(@config['geoloqi']['access_key'], 'location/history', 
-			:count => @config['geoloqi']['results_count'],
+		puts "Getting up to #{$config['geoloqi']['results_count']} entries starting at #{start}... "
+		response = Geoloqi.get($config['geoloqi']['access_key'], 'location/history', 
+			:count => $config['geoloqi']['results_count'],
 			:accuracy => 500,
 			:ignore_gaps => 1,
 			:after => start,
@@ -110,10 +110,10 @@ nagios if opt["nagios"]
 
 if defined?(::Sinatra) && defined?(::Sinatra::Base)
 	get '/' do
-		@min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<100"], :limit=>1).latitude
-		@min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<100"], :limit=>1).longitude
-		@max_lat = Entry.find(:first, :order=>'latitude DESC', :conditions=>["accuracy<100"], :limit=>1).latitude
-		@max_lon = Entry.find(:first, :order=>'longitude DESC', :conditions=>["accuracy<100"], :limit=>1).longitude
+		@min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).latitude
+		@min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).longitude
+		@max_lat = Entry.find(:first, :order=>'latitude DESC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).latitude
+		@max_lon = Entry.find(:first, :order=>'longitude DESC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).longitude
 		
 		lat_diff = @max_lat - @min_lat
 		lon_diff = @max_lon - @min_lon
@@ -125,10 +125,14 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		erb :index
 	end
 	
+	get '/test' do
+		return $config.inspect
+	end
+	
 	get '/wms' do
 		headers "Content-Type" => "image/png"
 		box = params[:BBOX].split(",")
-		big_dots = (box[2].to_f - box[0].to_f)<3000
+		big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
 		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
 		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
 		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
@@ -144,7 +148,7 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		x_factor = params[:WIDTH].to_i / (bbox2[1]-bbox1[1])
 		y_factor = params[:HEIGHT].to_i / (bbox2[0]-bbox1[0])
 
-		Entry.find(:all, :conditions=>["accuracy<100 && latitude>#{min_lat} && latitude<#{max_lat} && longitude>#{min_lon} && longitude<#{max_lon}"]).each do |point|
+		Entry.find(:all, :conditions=>["accuracy<#{$config["map"]["max_accuracy"]} && latitude>=#{min_lat} && latitude<=#{max_lat} && longitude>=#{min_lon} && longitude<=#{max_lon}"]).each do |point|
 			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
 			x = (point.longitude - min_lon)*x_factor
 			if big_dots

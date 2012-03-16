@@ -5,9 +5,10 @@ mysql:
     database: geoloqi_backup
     encoding: UTF8
 
-image_size: 2500
-
 geoloqi:
     access_key: 'see README.md for additional info'
     results_count: 1000
-    
+
+map:
+    max_accuracy: 50
+    big_dot_level: 3000
