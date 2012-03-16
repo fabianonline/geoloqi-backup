@@ -14,6 +14,7 @@ Diese App ist in Ruby geschrieben; folgende Gems werden benötigt:
 * yaml
 * geoloqi
 * RMagick
+* getopt
 
 Auf einem MySQL-Server wird eine Tabelle namens `entries` benötigt; der SQL-Code, um diese zu erzeugen, ist in db.schema.sql abgelegt.
 

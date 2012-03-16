@@ -4,8 +4,11 @@ require 'rubygems'
 require 'active_record'
 require 'yaml'
 require 'geoloqi'
+require 'getopt/long'
 
 @config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
+
+GEOLOQI_VERSION="0.1"
 
 ActiveRecord::Base.establish_connection(
     :adapter => 'mysql',
@@ -32,23 +35,20 @@ class Entry < ActiveRecord::Base
 		e.battery = point[:raw][:battery] rescue nil
 		e.save
 	end
-
-    def self.info
-		raise "not yet implemented"
-        puts "Tweets in DB: #{Tweet.count}"
-        puts "Neuester Tweet: #{Tweet.last.date} (vor #{(Time.now - Tweet.last.date) / 60} Minuten)"
-    end
-
 end
 
-#if opt["nagios"]
-#	raise "not yet implemented"
-#    diff = Time.now - Tweet.last.date # in Sekunden
-#    puts "Neuester Tweet ist #{(diff / 60).round} Minuten alt."
-#    exit 2 if diff > (24*60*60) # 24 Stunden - CRITICAL
-#    exit 1 if diff > (12*60*60) # 12 Stunden - WARNING
-#    exit 0 # Alles OK
-#end
+def nagios
+	diff = Time.now - Entry.last.date # in Sekunden
+	puts "Neuester Entry ist #{(diff / 60).round} Minuten alt."
+	exit 2 if diff > (3*24*60*60) # 3 Tage - CRITICAL
+	exit 1 if diff > (24*60*60) # 1 Tag - WARNING
+	exit 0 # Alles OK
+end
+
+def info
+	puts "Entries in DB: #{Entry.count}"
+	puts "Newest Entry: #{Entry.last.date} (vor #{(Time.now - Entry.last.date) / 60} Minuten)"
+end
 
 def update
 	begin
@@ -126,6 +126,32 @@ EOF
 	File.open(File.join(File.dirname(__FILE__), "image.html"), "w") {|f| f.write(html) }
 end
 
-update
-generate_graphic
+def help
+end
 
+opt = Getopt::Long.getopts(
+	['--update', '-u'],
+	['--nagios', '-n'],
+	['--info', '-i'],
+	['--help', '-h'],
+	['--graphic', '-g']
+) rescue {"help"=>true}
+
+if opt["help"] || opt.empty?
+	puts <<EOF
+geoloqi-backup Version #{GEOLOQI_VERSION}
+
+  --update,  -u   Lädt neue Datensätze von Geoloqi herunter und speichert sie
+                  in der MySQL-Datenbank.
+  --graphic, -g   Erzeugt neue Grafiken und Kartenansichten.
+  --info,    -i   Zeigt Infos über die in der Datenbank gespeicherten Einträge.
+  --nagios,  -n   Gibt Daten zum Tracking via Nagios aus.
+  --help,    -h   Diese Hilfe.
+EOF
+	exit
+end
+
+update if opt["update"]
+generate_graphic if opt["graphic"]
+info if opt["info"]
+nagios if opt["nagios"]
