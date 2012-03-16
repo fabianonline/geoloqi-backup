@@ -5,26 +5,19 @@
 	<body>
 		<div style="width:100%; height:100%" id="map"></div>
 		<script type="text/javascript" defer="defer">
-		
-		var from = new OpenLayers.Projection("EPSG:4326");
-				var map = new OpenLayers.Map('map', {projection: from});
-				var to = new OpenLayers.Projection("EPSG:900913");
-				
-				var osm_layer = new OpenLayers.Layer.OSM({projection: from});
-				osm_layer.setOpacity(0.3);
-				map.addLayer(osm_layer);
+			var proj_wgs84 = new OpenLayers.Projection("EPSG:4326");
+			var proj_mercator = new OpenLayers.Projection("EPSG:900913");
 			
-				var imagebounds = new OpenLayers.Bounds(<%= @min_lon %>, <%= @min_lat %>, <%= @max_lon %>, <%= @max_lat %>).transform(from, to);
-				//var layer = new OpenLayers.Layer.Image("overlay", "image.png", imagebounds, new OpenLayers.Size(1000, 1000), {alwaysInRange: true, isBaseLayer: false, transparent: true});
-				var layer = new OpenLayers.Layer.WMS("Geoloqi-Overlay", "<%= url("/wms") %>", {
-					transparent: true,
-					format: "image/png",
-					maxExtent: imagebounds
-				}, {
-					maxExtent: imagebounds
-				})
-				map.addLayer(layer);
-				map.zoomToExtent(imagebounds);
+			var map = new OpenLayers.Map('map');
+			
+			var osm_layer = new OpenLayers.Layer.OSM();
+			osm_layer.setOpacity(0.2);
+			map.addLayer(osm_layer);
+		
+			var imagebounds = new OpenLayers.Bounds(<%= @min_lon %>, <%= @min_lat %>, <%= @max_lon %>, <%= @max_lat %>).transform(proj_wgs84, proj_mercator);
+			var layer = new OpenLayers.Layer.WMS("Geoloqi-Overlay", "<%= url("/wms") %>", {transparent: true}, {maxExtent: imagebounds});
+			map.addLayer(layer);
+			map.zoomToExtent(imagebounds);
 				
 		</script>
 	</body>
