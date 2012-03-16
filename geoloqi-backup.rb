@@ -5,10 +5,11 @@ require 'active_record'
 require 'yaml'
 require 'geoloqi'
 require 'getopt/long'
+require 'RMagick'
 
 @config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
 
-GEOLOQI_VERSION="0.1"
+GEOLOQI_VERSION="0.2"
 
 ActiveRecord::Base.establish_connection(
     :adapter => 'mysql',
@@ -72,78 +73,19 @@ def update
 	end while true
 end
 
-def generate_graphic
-	require 'RMagick'
-	canvas = Magick::Image.new(@config['image_size'], @config['image_size']) { self.background_color = "transparent" }
-	gc = Magick::Draw.new
-	gc.stroke('black')
-
-	min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<100"], :limit=>1).latitude
-	min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<100"], :limit=>1).longitude
-	max_lat = Entry.find(:first, :order=>'latitude DESC', :conditions=>["accuracy<100"], :limit=>1).latitude
-	max_lon = Entry.find(:first, :order=>'longitude DESC', :conditions=>["accuracy<100"], :limit=>1).longitude
-
-	lat_diff = max_lat - min_lat
-	lon_diff = max_lon - min_lon
-	max_diff = [lat_diff, lon_diff].max
-
-	factor = @config['image_size'] / max_diff
-
-	Entry.find(:all, :conditions=>["accuracy<100"]).each do |point|
-		y = @config['image_size'] - (point.latitude - min_lat)*factor
-		x = (point.longitude - min_lon)*factor
-		gc.point(x, y)
-	end
-
-	gc.draw(canvas)
-	canvas.write(File.join(File.dirname(__FILE__), "image.png"))
-	
-	html = <<EOF
-		<html>
-			<head>
-				<script src="http://openlayers.org/api/OpenLayers.js"></script>
-			</head>
-			<body>
-				<div style="width:100%; height:100%" id="map"></div>
-				<script type="text/javascript" defer="defer">
-						var map = new OpenLayers.Map('map');
-						var from = new OpenLayers.Projection("EPSG:4326");
-						var to = new OpenLayers.Projection("EPSG:900913");
-						
-						var osm_layer = new OpenLayers.Layer.OSM();
-						osm_layer.setOpacity(0.3);
-						map.addLayer(osm_layer);
-					
-						var imagebounds = new OpenLayers.Bounds(#{min_lon}, #{min_lat}, #{min_lon+max_diff}, #{min_lat+max_diff}).transform(from, to);
-						var layer = new OpenLayers.Layer.Image("overlay", "image.png", imagebounds, new OpenLayers.Size(#{@config['image_size']}, #{@config['image_size']}), {alwaysInRange: true, isBaseLayer: false, transparent: true});
-						map.addLayer(layer);
-						map.zoomToExtent(imagebounds);
-						
-				</script>
-			</body>
-		</html>
-EOF
-	File.open(File.join(File.dirname(__FILE__), "image.html"), "w") {|f| f.write(html) }
-end
-
-def help
-end
-
 opt = Getopt::Long.getopts(
 	['--update', '-u'],
 	['--nagios', '-n'],
 	['--info', '-i'],
-	['--help', '-h'],
-	['--graphic', '-g']
-) rescue {"help"=>true}
+	['--help', '-h']
+) rescue {}
 
-if opt["help"] || opt.empty?
+if opt["help"]
 	puts <<EOF
 geoloqi-backup Version #{GEOLOQI_VERSION}
 
   --update,  -u   Lädt neue Datensätze von Geoloqi herunter und speichert sie
                   in der MySQL-Datenbank.
-  --graphic, -g   Erzeugt neue Grafiken und Kartenansichten.
   --info,    -i   Zeigt Infos über die in der Datenbank gespeicherten Einträge.
   --nagios,  -n   Gibt Daten zum Tracking via Nagios aus.
   --help,    -h   Diese Hilfe.
@@ -152,6 +94,69 @@ EOF
 end
 
 update if opt["update"]
-generate_graphic if opt["graphic"]
 info if opt["info"]
 nagios if opt["nagios"]
+
+
+
+
+
+
+
+
+##########################################
+# Sinatra Stuff
+##########################################
+
+if defined?(::Sinatra) && defined?(::Sinatra::Base)
+	get '/' do
+		@min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<100"], :limit=>1).latitude
+		@min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<100"], :limit=>1).longitude
+		@max_lat = Entry.find(:first, :order=>'latitude DESC', :conditions=>["accuracy<100"], :limit=>1).latitude
+		@max_lon = Entry.find(:first, :order=>'longitude DESC', :conditions=>["accuracy<100"], :limit=>1).longitude
+		
+		lat_diff = @max_lat - @min_lat
+		lon_diff = @max_lon - @min_lon
+		max_diff = [lat_diff, lon_diff].max
+		
+		@max_lon = @min_lon + max_diff
+		@max_lat = @min_lat + max_diff
+		
+		erb :index
+	end
+	
+	get '/wms' do
+		headers "Content-Type" => "image/png"
+		box = params[:BBOX].split(",")
+		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
+		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
+		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
+		gc = Magick::Draw.new
+		gc.stroke('black')
+
+		min_lat = bbox1[0]
+		min_lon = bbox1[1]
+		max_lat = bbox2[0]
+		max_lon = bbox2[1]
+		
+		x_factor = params[:WIDTH].to_i / (bbox2[1]-bbox1[1])
+		y_factor = params[:HEIGHT].to_i / (bbox2[0]-bbox1[0])
+
+		Entry.find(:all, :conditions=>["accuracy<100 && latitude>#{min_lat} && latitude<#{max_lat} && longitude>#{min_lon} && longitude<#{max_lon}"]).each do |point|
+			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
+			x = (point.longitude - min_lon)*x_factor
+			gc.point(x, y)
+		end
+
+		gc.draw(canvas)
+		canvas.to_blob {self.format="png"}
+	end
+end
+
+
+
+def merctolatlon(x, y)
+	lon = (x / 6378137.0) / Math::PI * 180
+	lat = Math::atan(Math::sinh(y / 6378137.0)) / Math::PI * 180
+	return [lat, lon]
+end
