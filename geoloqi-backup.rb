@@ -74,7 +74,7 @@ end
 
 def generate_graphic
 	require 'RMagick'
-	canvas = Magick::Image.new(@config['image_size'], @config['image_size'])
+	canvas = Magick::Image.new(@config['image_size'], @config['image_size']) { self.background_color = "transparent" }
 	gc = Magick::Draw.new
 	gc.stroke('black')
 
@@ -85,7 +85,6 @@ def generate_graphic
 
 	lat_diff = max_lat - min_lat
 	lon_diff = max_lon - min_lon
-
 	max_diff = [lat_diff, lon_diff].max
 
 	factor = @config['image_size'] / max_diff
@@ -98,6 +97,33 @@ def generate_graphic
 
 	gc.draw(canvas)
 	canvas.write(File.join(File.dirname(__FILE__), "image.png"))
+	
+	html = <<EOF
+		<html>
+			<head>
+				<script src="http://openlayers.org/api/OpenLayers.js"></script>
+			</head>
+			<body>
+				<div style="width:100%; height:100%" id="map"></div>
+				<script type="text/javascript" defer="defer">
+						var map = new OpenLayers.Map('map');
+						var from = new OpenLayers.Projection("EPSG:4326");
+						var to = new OpenLayers.Projection("EPSG:900913");
+						
+						var osm_layer = new OpenLayers.Layer.OSM();
+						osm_layer.setOpacity(0.3);
+						map.addLayer(osm_layer);
+					
+						var imagebounds = new OpenLayers.Bounds(#{min_lon}, #{min_lat}, #{min_lon+max_diff}, #{min_lat+max_diff}).transform(from, to);
+						var layer = new OpenLayers.Layer.Image("overlay", "image.png", imagebounds, new OpenLayers.Size(#{@config['image_size']}, #{@config['image_size']}), {alwaysInRange: true, isBaseLayer: false, transparent: true});
+						map.addLayer(layer);
+						map.zoomToExtent(imagebounds);
+						
+				</script>
+			</body>
+		</html>
+EOF
+	File.open(File.join(File.dirname(__FILE__), "image.html"), "w") {|f| f.write(html) }
 end
 
 update
