@@ -128,11 +128,13 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 	get '/wms' do
 		headers "Content-Type" => "image/png"
 		box = params[:BBOX].split(",")
+		big_dots = (box[2].to_f - box[0].to_f)<3000
 		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
 		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
 		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
 		gc = Magick::Draw.new
 		gc.stroke('black')
+		gc.fill('black')
 
 		min_lat = bbox1[0]
 		min_lon = bbox1[1]
@@ -145,7 +147,11 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		Entry.find(:all, :conditions=>["accuracy<100 && latitude>#{min_lat} && latitude<#{max_lat} && longitude>#{min_lon} && longitude<#{max_lon}"]).each do |point|
 			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
 			x = (point.longitude - min_lon)*x_factor
-			gc.point(x, y)
+			if big_dots
+				gc.rectangle(x-1, y-1, x+1, y+1)
+			else
+				gc.point(x,y)
+			end
 		end
 
 		gc.draw(canvas)
