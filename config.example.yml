@@ -1,0 +1,13 @@
+mysql:
+    host: localhost
+    username: root
+    password: secret
+    database: geoloqi_backup
+    encoding: UTF8
+
+image_size: 2500
+
+geoloqi:
+    access_key: 'see README.md for additional info'
+    results_count: 1000
+    
