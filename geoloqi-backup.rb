@@ -78,10 +78,10 @@ def generate_graphic
 	gc = Magick::Draw.new
 	gc.stroke('black')
 
-	min_lat = Entry.find(:first, :order=>'latitude ASC', :limit=>1).latitude
-	min_lon = Entry.find(:first, :order=>'longitude ASC', :limit=>1).longitude
-	max_lat = Entry.find(:first, :order=>'latitude DESC', :limit=>1).latitude
-	max_lon = Entry.find(:first, :order=>'longitude DESC', :limit=>1).longitude
+	min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<100"], :limit=>1).latitude
+	min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<100"], :limit=>1).longitude
+	max_lat = Entry.find(:first, :order=>'latitude DESC', :conditions=>["accuracy<100"], :limit=>1).latitude
+	max_lon = Entry.find(:first, :order=>'longitude DESC', :conditions=>["accuracy<100"], :limit=>1).longitude
 
 	lat_diff = max_lat - min_lat
 	lon_diff = max_lon - min_lon
@@ -90,7 +90,7 @@ def generate_graphic
 
 	factor = 1000 / max_diff
 
-	Entry.all.each do |point|
+	Entry.find(:all, :conditions=>["accuracy<100"]).each do |point|
 		y = 1000 - (point.latitude - min_lat)*factor
 		x = (point.longitude - min_lon)*factor
 		gc.point(x, y)
