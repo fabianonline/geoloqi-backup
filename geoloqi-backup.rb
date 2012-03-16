@@ -29,7 +29,8 @@ class Entry < ActiveRecord::Base
 		e.altitude = point[:location][:position][:altitude]
 		e.heading = point[:location][:position][:heading]
 		e.accuracy = point[:location][:position][:horizontal_accuracy]
-		e.raw_data = point.to_json
+		e.uuid = point[:uuid]
+		e.battery = point[:raw][:battery] rescue nil
 		e.save
 	end
 
@@ -128,3 +129,4 @@ end
 
 update
 generate_graphic
+
