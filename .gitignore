@@ -1,5 +1,5 @@
 config.yml
-
-image.png
 log.log
-image.html
+.htaccess
+tmp/*
+
