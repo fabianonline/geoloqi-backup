@@ -74,7 +74,7 @@ end
 
 def generate_graphic
 	require 'RMagick'
-	canvas = Magick::Image.new(1000, 1000)
+	canvas = Magick::Image.new(@config['image_size'], @config['image_size'])
 	gc = Magick::Draw.new
 	gc.stroke('black')
 
@@ -88,10 +88,10 @@ def generate_graphic
 
 	max_diff = [lat_diff, lon_diff].max
 
-	factor = 1000 / max_diff
+	factor = @config['image_size'] / max_diff
 
 	Entry.find(:all, :conditions=>["accuracy<100"]).each do |point|
-		y = 1000 - (point.latitude - min_lat)*factor
+		y = @config['image_size'] - (point.latitude - min_lat)*factor
 		x = (point.longitude - min_lon)*factor
 		gc.point(x, y)
 	end
