@@ -2,7 +2,6 @@
 
 require 'rubygems'
 require 'active_record'
-require 'active_support'
 require 'yaml'
 require 'geoloqi'
 
