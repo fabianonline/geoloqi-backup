@@ -151,6 +151,17 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		Entry.find(:all, :conditions=>["accuracy<#{$config["map"]["max_accuracy"]} && latitude>=#{min_lat} && latitude<=#{max_lat} && longitude>=#{min_lon} && longitude<=#{max_lon}"]).each do |point|
 			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
 			x = (point.longitude - min_lon)*x_factor
+			diff = (Time.now - point.date).to_i
+			color = case
+				when diff > 7*24*60*60
+					'#aaa'
+				when diff > 1*24*60*60
+					'#777'
+				else
+					'black'
+			end
+			gc.stroke(color)
+			gc.fill(color)
 			if big_dots
 				gc.rectangle(x-1, y-1, x+1, y+1)
 			else
