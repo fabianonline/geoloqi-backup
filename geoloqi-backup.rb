@@ -135,6 +135,7 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
 		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
 		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
+		filename = File.join(File.dirname(__FILE__), "public", "image_cache", "#{params[:BBOX]}.png")
 		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
 		gc = Magick::Draw.new
 		gc.stroke('black')
@@ -147,21 +148,34 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		
 		x_factor = params[:WIDTH].to_i / (bbox2[1]-bbox1[1])
 		y_factor = params[:HEIGHT].to_i / (bbox2[0]-bbox1[0])
+		
+		conditions = ["accuracy<#{$config["map"]["max_accuracy"]}", "latitude>=#{min_lat}", "latitude<=#{max_lat}", "longitude>=#{min_lon}", "longitude<=#{max_lon}"]
+		
+		color = 'black'
+		cache_result = false
+		if params[:TYPE] == "all"
+			last_date = begin
+				Entry.find(:first, :conditions=>[conditions.join(" && ")], :order=>"date DESC", :limit=>1).date
+			rescue
+				filename = File.join(File.dirname(__FILE__), "public", "image_cache", "empty.png")
+				Time.at(0)
+			end
+			if File.exists?(filename) && File.mtime(filename)>=last_date
+				return File.open(filename, "r") {|f| f.read() }
+			end
+			color = '#999'
+			cache_result = true
+		elsif params[:TYPE] == "new"
+			conditions << "date>=FROM_UNIXTIME(#{Time.now.to_i - 24*60*60})"
+		end
+		
+		gc.stroke(color)
+		gc.fill(color)
 
-		Entry.find(:all, :conditions=>["accuracy<#{$config["map"]["max_accuracy"]} && latitude>=#{min_lat} && latitude<=#{max_lat} && longitude>=#{min_lon} && longitude<=#{max_lon}"]).each do |point|
+		Entry.find(:all, :conditions=>[conditions.join(" && ")]).each do |point|
 			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
 			x = (point.longitude - min_lon)*x_factor
 			diff = (Time.now - point.date).to_i
-			color = case
-				when diff > 7*24*60*60
-					'#aaa'
-				when diff > 1*24*60*60
-					'#777'
-				else
-					'black'
-			end
-			gc.stroke(color)
-			gc.fill(color)
 			if big_dots
 				gc.rectangle(x-1, y-1, x+1, y+1)
 			else
@@ -170,7 +184,13 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		end
 
 		gc.draw(canvas)
-		canvas.to_blob {self.format="png"}
+		image = canvas.to_blob {self.format="png"}
+		
+		if cache_result
+			File.open(filename, "w") {|f| f.write(image) } rescue nil
+		end
+		
+		return image
 	end
 end
 

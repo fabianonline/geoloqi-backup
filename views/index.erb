@@ -9,14 +9,18 @@
 			var proj_mercator = new OpenLayers.Projection("EPSG:900913");
 			
 			var map = new OpenLayers.Map('map');
+			map.addControl(new OpenLayers.Control.LayerSwitcher());
 			
 			var osm_layer = new OpenLayers.Layer.OSM();
 			osm_layer.setOpacity(0.2);
 			map.addLayer(osm_layer);
 		
 			var imagebounds = new OpenLayers.Bounds(<%= @min_lon %>, <%= @min_lat %>, <%= @max_lon %>, <%= @max_lat %>).transform(proj_wgs84, proj_mercator);
-			var layer = new OpenLayers.Layer.WMS("Geoloqi-Overlay", "<%= url("/wms") %>", {transparent: true}, {maxExtent: imagebounds});
-			map.addLayer(layer);
+			var layer_old = new OpenLayers.Layer.WMS("Geoloqi-Overlay, alle Daten", "<%= url("/wms") %>", {transparent: true, type: 'all'}, {maxExtent: imagebounds});
+			var layer_new = new OpenLayers.Layer.WMS("Geoloqi-Overlay, neue Daten", "<%= url("/wms") %>", {transparent: true, type: 'new'}, {maxExtent: imagebounds});
+			
+			map.addLayer(layer_old);
+			map.addLayer(layer_new);
 			map.zoomToExtent(imagebounds);
 				
 		</script>
