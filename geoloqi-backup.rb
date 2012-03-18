@@ -109,6 +109,10 @@ nagios if opt["nagios"]
 ##########################################
 
 if defined?(::Sinatra) && defined?(::Sinatra::Base)
+	before do
+		ActiveRecord::Base.connection.verify!
+	end
+
 	get '/' do
 		@min_lat = Entry.find(:first, :order=>'latitude ASC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).latitude
 		@min_lon = Entry.find(:first, :order=>'longitude ASC', :conditions=>["accuracy<#{$config["map"]["max_accuracy"]}"], :limit=>1).longitude
