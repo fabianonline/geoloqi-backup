@@ -98,6 +98,74 @@ def update
 	end while true
 end
 
+def generate_image(bbox, o={})
+	opts = {
+		:background=>'transparent',
+		:color=>'black',
+		:use_cached_version=>true,
+		:save_in_cache=>true,
+		:width=>256,
+		:height=>256,
+		:additional_conditions=>[]
+	}.merge(o)
+
+	box = bbox.split(",")
+	big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
+	bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
+	bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
+	zoomlevel = "%02d" % (17-((Math.log((box[2].to_f-box[0].to_f).abs*3.281/500) / Math.log(2)).round))
+	filename = File.join(File.dirname(__FILE__), "public", "image_cache", zoomlevel, "#{params[:BBOX]}.png")
+	FileUtils.mkdir_p(File.dirname(filename))
+	canvas = Magick::Image.new(opts[:width], opts[:height]) { self.background_color = opts[:background] }
+	gc = Magick::Draw.new
+	gc.stroke(opts[:color])
+	gc.fill(opts[:color])
+
+	min_lat = bbox1[0]
+	min_lon = bbox1[1]
+	max_lat = bbox2[0]
+	max_lon = bbox2[1]
+	
+	x_factor = opts[:width]/ (bbox2[1]-bbox1[1])
+	y_factor = opts[:height] / (bbox2[0]-bbox1[0])
+	
+	conditions = ["accuracy<#{$config["map"]["max_accuracy"]}", "latitude>=#{min_lat}", "latitude<=#{max_lat}", "longitude>=#{min_lon}", "longitude<=#{max_lon}"]
+	conditions = conditions + opts[:additional_conditions]
+
+	if opts[:use_cached_version]
+		last_date = begin
+			Entry.find(:first, :conditions=>[conditions.join(" && ")], :order=>"date DESC", :limit=>1).date
+		rescue
+			filename = File.join(File.dirname(__FILE__), "public", "image_cache", "empty.png")
+			Time.at(0)
+		end
+		if File.exists?(filename) && File.mtime(filename)>=last_date
+			return File.open(filename, "r") {|f| f.read() }
+		end
+	end
+
+
+	Entry.find(:all, :conditions=>[conditions.join(" && ")]).each do |point|
+		y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
+		x = (point.longitude - min_lon)*x_factor
+		diff = (Time.now - point.date).to_i
+		if big_dots
+			gc.rectangle(x-1, y-1, x+1, y+1)
+		else
+			gc.point(x,y)
+		end
+	end
+
+	gc.draw(canvas)
+	image = canvas.to_blob {self.format="png"}
+	
+	if opts[:save_in_cache]
+		File.open(filename, "w") {|f| f.write(image) } rescue nil
+	end
+	
+	return image
+end
+
 opt = Getopt::Long.getopts(
 	['--update', '-u'],
 	['--nagios', '-n'],
@@ -167,68 +235,13 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 	
 	get '/wms' do
 		headers "Content-Type" => "image/png"
-		box = params[:BBOX].split(",")
-		big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
-		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
-		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
-		zoomlevel = "%02d" % (17-((Math.log((box[2].to_f-box[0].to_f)*3.281/500) / Math.log(2)).round))
-		filename = File.join(File.dirname(__FILE__), "public", "image_cache", zoomlevel, "#{params[:BBOX]}.png")
-		FileUtils.mkdir_p(File.dirname(filename))
-		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
-		gc = Magick::Draw.new
-		gc.stroke('black')
-		gc.fill('black')
-
-		min_lat = bbox1[0]
-		min_lon = bbox1[1]
-		max_lat = bbox2[0]
-		max_lon = bbox2[1]
-		
-		x_factor = params[:WIDTH].to_i / (bbox2[1]-bbox1[1])
-		y_factor = params[:HEIGHT].to_i / (bbox2[0]-bbox1[0])
-		
-		conditions = ["accuracy<#{$config["map"]["max_accuracy"]}", "latitude>=#{min_lat}", "latitude<=#{max_lat}", "longitude>=#{min_lon}", "longitude<=#{max_lon}"]
-		
-		color = 'black'
-		cache_result = false
+		p = {:width=>params[:WIDTH].to_i, :height=>params[:HEIGHT].to_i}
 		if params[:TYPE] == "all"
-			last_date = begin
-				Entry.find(:first, :conditions=>[conditions.join(" && ")], :order=>"date DESC", :limit=>1).date
-			rescue
-				filename = File.join(File.dirname(__FILE__), "public", "image_cache", "empty.png")
-				Time.at(0)
-			end
-			if File.exists?(filename) && File.mtime(filename)>=last_date
-				return File.open(filename, "r") {|f| f.read() }
-			end
-			color = '#999'
-			cache_result = true
-		elsif params[:TYPE] == "new"
-			conditions << "date>=FROM_UNIXTIME(#{Time.now.to_i - 24*60*60})"
+			p.merge!({:color=>'#999'})
+		else
+			p.merge!({:use_cached_version=>false, :save_in_cache=>false, :additional_conditions=>["date>=FROM_UNIXTIME(#{Time.now.to_i - 24*60*60})"]})
 		end
-		
-		gc.stroke(color)
-		gc.fill(color)
-
-		Entry.find(:all, :conditions=>[conditions.join(" && ")]).each do |point|
-			y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
-			x = (point.longitude - min_lon)*x_factor
-			diff = (Time.now - point.date).to_i
-			if big_dots
-				gc.rectangle(x-1, y-1, x+1, y+1)
-			else
-				gc.point(x,y)
-			end
-		end
-
-		gc.draw(canvas)
-		image = canvas.to_blob {self.format="png"}
-		
-		if cache_result
-			File.open(filename, "w") {|f| f.write(image) } rescue nil
-		end
-		
-		return image
+		return generate_image(params[:BBOX], p)
 	end
 end
 
