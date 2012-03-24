@@ -36,6 +36,29 @@ class Entry < ActiveRecord::Base
 		e.battery = point[:raw][:battery] rescue nil
 		e.save
 	end
+	
+	def self.add_multiple_points(array)
+		puts "    Creating query..."
+		fields = "(date, latitude, longitude, speed, altitude, heading, accuracy, uuid, battery)"
+		data = []
+		array.each do |point|
+			temp_data = ["FROM_UNIXTIME(#{point[:date_ts]})",
+				point[:location][:position][:latitude],
+				point[:location][:position][:longitude],
+				point[:location][:position][:speed],
+				point[:location][:position][:altitude],
+				point[:location][:position][:heading],
+				point[:location][:position][:horizontal_accuracy],
+				"'#{point[:uuid]}'",
+				(point[:raw][:battery] rescue "NULL")]
+			data.push "(#{temp_data.join(', ')})"
+		end
+		sql = "INSERT INTO #{Entry.table_name} #{fields} VALUES \n  #{data.join(", \n  ")}"
+		print "    Executing Query... "
+		start = Time.now.to_f
+		diff = Time.now.to_f - start
+		puts "(took %.3f seconds)." % diff
+	end
 end
 
 def nagios
@@ -68,7 +91,7 @@ def update
 		end
 
 		puts "Got #{response[:points].count} results. Adding to database..."
-		response[:points].each {|point| Entry.add(point)}
+		Entry.add_multiple_points(response[:points])
 		puts ""
 	end while true
 end
