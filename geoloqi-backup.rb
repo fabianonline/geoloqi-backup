@@ -54,8 +54,10 @@ class Entry < ActiveRecord::Base
 			data.push "(#{temp_data.join(', ')})"
 		end
 		sql = "INSERT INTO #{Entry.table_name} #{fields} VALUES \n  #{data.join(", \n  ")}"
+		puts sql if $verbose
 		print "    Executing Query... "
 		start = Time.now.to_f
+		Entry.connection.execute(sql) unless $dry_run
 		diff = Time.now.to_f - start
 		puts "(took %.3f seconds)." % diff
 	end
@@ -100,7 +102,9 @@ opt = Getopt::Long.getopts(
 	['--update', '-u'],
 	['--nagios', '-n'],
 	['--info', '-i'],
-	['--help', '-h']
+	['--help', '-h'],
+	['--dry-run'],
+	['--verbose']
 ) rescue {}
 
 if opt["help"]
@@ -111,10 +115,15 @@ geoloqi-backup Version #{GEOLOQI_VERSION}
                   in der MySQL-Datenbank.
   --info,    -i   Zeigt Infos über die in der Datenbank gespeicherten Einträge.
   --nagios,  -n   Gibt Daten zum Tracking via Nagios aus.
+  --dry-run       Nimmt keine Änderungen vor.
+  --verbose       Gibt mehr (zu viele?) Infos aus.
   --help,    -h   Diese Hilfe.
 EOF
 	exit
 end
+
+$verbose = opt.has_key? "verbose"
+$dry_run = opt.has_key? "dry-run"
 
 update if opt["update"]
 info if opt["info"]
