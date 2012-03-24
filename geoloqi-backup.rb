@@ -171,7 +171,9 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
 		bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
 		bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
-		filename = File.join(File.dirname(__FILE__), "public", "image_cache", "#{params[:BBOX]}.png")
+		zoomlevel = "%02d" % (17-((Math.log((box[2].to_f-box[0].to_f)*3.281/500) / Math.log(2)).round))
+		filename = File.join(File.dirname(__FILE__), "public", "image_cache", zoomlevel, "#{params[:BBOX]}.png")
+		FileUtils.mkdir_p(File.dirname(filename))
 		canvas = Magick::Image.new(params[:WIDTH].to_i, params[:HEIGHT].to_i) { self.background_color = "transparent" }
 		gc = Magick::Draw.new
 		gc.stroke('black')
