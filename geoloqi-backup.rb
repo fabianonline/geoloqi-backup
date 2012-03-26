@@ -106,7 +106,8 @@ def generate_image(bbox, o={})
 		:save_in_cache=>true,
 		:width=>256,
 		:height=>256,
-		:additional_conditions=>[]
+		:additional_conditions=>[],
+		:color_by=>nil
 	}.merge(o)
 
 	box = bbox.split(",")
@@ -146,6 +147,13 @@ def generate_image(bbox, o={})
 
 
 	Entry.find_each(:conditions=>[conditions.join(" && ")]) do |point|
+		if opts[:color_by]==:accuracy
+			color = "red"
+			color = "yellow" if point.accuracy<=30
+			color = "green" if point.accuracy<=10
+			gc.fill(color)
+			gc.stroke(color)
+		end
 		y = opts[:height] - (point.latitude - min_lat)*y_factor
 		x = (point.longitude - min_lon)*x_factor
 		if big_dots
