@@ -146,7 +146,7 @@ def generate_image(bbox, o={})
 
 
 	Entry.find(:all, :conditions=>[conditions.join(" && ")]).each do |point|
-		y = params[:HEIGHT].to_i - (point.latitude - min_lat)*y_factor
+		y = opts[:height] - (point.latitude - min_lat)*y_factor
 		x = (point.longitude - min_lon)*x_factor
 		diff = (Time.now - point.date).to_i
 		if big_dots
