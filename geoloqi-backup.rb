@@ -145,10 +145,9 @@ def generate_image(bbox, o={})
 	end
 
 
-	Entry.find(:all, :conditions=>[conditions.join(" && ")]).each do |point|
+	Entry.find_each(:conditions=>[conditions.join(" && ")]) do |point|
 		y = opts[:height] - (point.latitude - min_lat)*y_factor
 		x = (point.longitude - min_lon)*x_factor
-		diff = (Time.now - point.date).to_i
 		if big_dots
 			gc.rectangle(x-1, y-1, x+1, y+1)
 		else
