@@ -162,8 +162,8 @@ def generate_image(bbox, o={})
 			gc.fill(color)
 			gc.stroke(color)
 		end
-		y = opts[:height] - (point.latitude - min_lat)*y_factor
-		x = (point.longitude - min_lon)*x_factor
+		y = (opts[:height] - (point.latitude - min_lat)*y_factor).round
+		x = ((point.longitude - min_lon)*x_factor).round
 		if big_dots
 			gc.rectangle(x-1, y-1, x+1, y+1)
 		else
