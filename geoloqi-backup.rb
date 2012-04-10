@@ -114,8 +114,9 @@ def generate_image(bbox, o={})
 	big_dots = (box[2].to_f - box[0].to_f)<$config["map"]["big_dot_level"]
 	bbox1 = merctolatlon(box[0].to_f, box[1].to_f)
 	bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
-	zoomlevel = "%02d" % (17-((Math.log((box[2].to_f-box[0].to_f).abs*3.281/500) / Math.log(2)).round))
-	filename = File.join(File.dirname(__FILE__), "public", "image_cache", zoomlevel, "#{params[:BBOX]}.png")
+	zoomlevel = (17-((Math.log((box[2].to_f-box[0].to_f).abs*3.281/500) / Math.log(2)).round))
+	big_dots = zoomlevel>=$config["map"]["big_dot_level"]
+	filename = File.join(File.dirname(__FILE__), "public", "image_cache", ("%02d" % zoomlevel), "#{params[:BBOX]}.png")
 	FileUtils.mkdir_p(File.dirname(filename))
 	canvas = Magick::Image.new(opts[:width], opts[:height]) { self.background_color = opts[:background] }
 	gc = Magick::Draw.new
