@@ -140,7 +140,7 @@ def generate_image(bbox, o={})
 	if opts[:use_cached_version]
 		if File.exists?(filename)
 			canvas = Magick::ImageList.new(filename).first
-			conditions << "date>=FROM_UNIXTIME(#{Time.now.to_i})"
+			conditions << "date>=FROM_UNIXTIME(#{File.mtime(filename).to_i})"
 		else
 			# Bild existiert nicht im Cache - könnte also auch leer sein...
 			filename = File.join(File.dirname(filename), "empty.png") if Entry.count(:conditions=>conditions.join(" && "))==0
