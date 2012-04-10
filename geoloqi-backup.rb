@@ -10,7 +10,7 @@ require 'RMagick'
 $config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
 
 GEOLOQI_VERSION="0.2"
-DEBUG_GENERATE_IMAGE_TIMES=true
+DEBUG_GENERATE_IMAGE_TIMES=false
 
 ActiveRecord::Base.establish_connection(
     :adapter => 'mysql',
