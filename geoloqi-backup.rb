@@ -10,6 +10,7 @@ require 'RMagick'
 $config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
 
 GEOLOQI_VERSION="0.2"
+DEBUG_GENERATE_IMAGE_TIMES=true
 
 ActiveRecord::Base.establish_connection(
     :adapter => 'mysql',
@@ -99,6 +100,8 @@ def update
 end
 
 def generate_image(bbox, o={})
+	values = [] if DEBUG_GENERATE_IMAGE_TIMES
+	start_total = Time.now.to_f if DEBUG_GENERATE_IMAGE_TIMES
 	opts = {
 		:background=>'transparent',
 		:color=>'black',
@@ -167,6 +170,7 @@ def generate_image(bbox, o={})
 			gc.point(x,y)
 		end
 	end
+	values << (Time.now.to_f - start) if DEBUG_GENERATE_IMAGE_TIMES && !first
 
 	gc.draw(canvas)
 	image = canvas.to_blob {self.format="png"}
@@ -175,6 +179,8 @@ def generate_image(bbox, o={})
 		File.open(filename, "w") {|f| f.write(image) } rescue nil
 	end
 	
+	values << (Time.now.to_f - start_total) if DEBUG_GENERATE_IMAGE_TIMES
+	File.open(File.join(File.dirname(__FILE__), "log.log"), "a") {|f| f.write(values.join(';') + "\n")} if DEBUG_GENERATE_IMAGE_TIMES
 	return image
 end
 
