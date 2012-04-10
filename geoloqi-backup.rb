@@ -135,19 +135,23 @@ def generate_image(bbox, o={})
 	conditions = conditions + opts[:additional_conditions]
 
 	if opts[:use_cached_version]
-		last_date = begin
-			Entry.find(:first, :conditions=>[conditions.join(" && ")], :order=>"date DESC", :limit=>1).date
-		rescue
-			filename = File.join(File.dirname(__FILE__), "public", "image_cache", "empty.png")
-			Time.at(0)
-		end
-		if File.exists?(filename) && File.mtime(filename)>=last_date
-			return File.open(filename, "r") {|f| f.read() }
+		if File.exists?(filename)
+			canvas = Magick::ImageList.new(filename).first
+			conditions << "date>=FROM_UNIXTIME(#{Time.now.to_i})"
+		else
+			# Bild existiert nicht im Cache - könnte also auch leer sein...
+			filename = File.join(File.dirname(filename), "empty.png") if Entry.count(:conditions=>conditions.join(" && "))==0
 		end
 	end
 
-
-	Entry.find_each(:conditions=>[conditions.join(" && ")]) do |point|
+	start = Time.now.to_f if DEBUG_GENERATE_IMAGE_TIMES
+	first = true if DEBUG_GENERATE_IMAGE_TIMES
+	Entry.find_each(:conditions=>[conditions.join(" && ")], :select=>"id, latitude, longitude, accuracy") do |point|
+		if DEBUG_GENERATE_IMAGE_TIMES && first
+			values << (Time.now.to_f - start)
+			first = false
+			start = Time.now.to_f
+		end
 		if opts[:color_by]==:accuracy
 			color = "red"
 			color = "yellow" if point.accuracy<=30
