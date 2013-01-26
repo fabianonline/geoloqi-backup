@@ -261,6 +261,23 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 		end
 		return generate_image(params[:BBOX], p)
 	end
+	
+	get '/tripinfo' do
+		coords1 = merctolatlon(params[:lon1].to_f, params[:lat1].to_f)
+		coords2 = merctolatlon(params[:lon2].to_f, params[:lat2].to_f)
+		
+		center = [(coords1[0]+coords2[0])/2, (coords1[1]+coords2[1])/2]
+		
+		Entry.
+			where(:latitude=>(coords2[0]..coords1[0])).
+			where(:longitude=>(coords1[1]..coords2[1])).
+			order("SQRT(((latitude-#{center[0]})*(latitude-#{center[0]}))+((longitude-#{center[1]})*(longitude-#{center[1]})))").
+			group("FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(date)/600)*600)").
+			limit(10).
+			collect{|e| "<li>#{e.date.to_s}</li>"}.
+			join("")
+		#coords1.inspect + "<br />" + coords2.inspect
+	end
 end
 
 
