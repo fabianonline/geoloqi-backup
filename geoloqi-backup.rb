@@ -39,7 +39,7 @@ class Entry < ActiveRecord::Base
 	end
 	
 	def self.add_multiple_points(array)
-		puts "    Creating query..."
+		puts "    Creating query..." if $verbose
 		fields = "(date, latitude, longitude, speed, altitude, heading, accuracy, uuid, battery)"
 		data = []
 		array.each do |point|
@@ -56,11 +56,8 @@ class Entry < ActiveRecord::Base
 		end
 		sql = "INSERT INTO #{Entry.table_name} #{fields} VALUES \n  #{data.join(", \n  ")}"
 		puts sql if $verbose
-		print "    Executing Query... "
-		start = Time.now.to_f
+		print "    Executing Query... " if $verbose
 		Entry.connection.execute(sql) unless $dry_run
-		diff = Time.now.to_f - start
-		puts "(took %.3f seconds)." % diff
 	end
 end
 
@@ -79,8 +76,18 @@ end
 
 def update
 	begin
+		if $verbose
+			puts
+		else
+			print Time.now.strftime "| %d.%m.%y %H:%M | "
+		end
 		start = Entry.find(:first, :order=>'date DESC').date.to_i rescue "0"
-		puts "Getting up to #{$config['geoloqi']['results_count']} entries starting at #{start}... "
+		if $verbose
+			puts "Getting up to #{$config['geoloqi']['results_count']} entries starting at #{start}... "
+		else
+			print "%6d | " % $config['geoloqi']['results_count']
+			print "%10d | " % start
+		end
 		response = Geoloqi.get($config['geoloqi']['access_key'], 'location/history', 
 			:count => $config['geoloqi']['results_count'],
 			:accuracy => 500,
@@ -169,6 +176,7 @@ def generate_image(bbox, o={})
 		else
 			gc.point(x,y)
 		end
+		print "."
 	end
 	values << (Time.now.to_f - start) if DEBUG_GENERATE_IMAGE_TIMES && !first
 
@@ -178,6 +186,7 @@ def generate_image(bbox, o={})
 	if opts[:save_in_cache]
 		File.open(filename, "w") {|f| f.write(image) } rescue nil
 	end
+	puts
 	
 	values << (Time.now.to_f - start_total) if DEBUG_GENERATE_IMAGE_TIMES
 	File.open(File.join(File.dirname(__FILE__), "log.log"), "a") {|f| f.write(values.join(';') + "\n")} if DEBUG_GENERATE_IMAGE_TIMES
