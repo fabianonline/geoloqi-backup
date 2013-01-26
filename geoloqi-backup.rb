@@ -61,6 +61,19 @@ class Entry < ActiveRecord::Base
 	end
 end
 
+
+def latlontomerc(x, y)
+	x = x * 6378137.0 * Math::PI / 180.0
+	y = Math::asinh(Math::tan(y / 180.0 * Math::PI)) * 6378137.0
+	return [x, y]
+end
+
+def merctolatlon(x, y)
+	lon = (x / 6378137.0) / Math::PI * 180
+	lat = Math::atan(Math::sinh(y / 6378137.0)) / Math::PI * 180
+	return [lat, lon]
+end
+
 def nagios
 	diff = Time.now - Entry.last.date # in Sekunden
 	puts "Neuester Entry ist #{(diff / 60).round} Minuten alt."
@@ -126,7 +139,7 @@ def generate_image(bbox, o={})
 	bbox2 = merctolatlon(box[2].to_f, box[3].to_f)
 	zoomlevel = (17-((Math.log((box[2].to_f-box[0].to_f).abs*3.281/500) / Math.log(2)).round))
 	big_dots = zoomlevel>=$config["map"]["big_dot_level"]
-	filename = File.join(File.dirname(__FILE__), "public", "image_cache", ("%02d" % zoomlevel), "#{params[:BBOX]}.png")
+	filename = File.join(File.dirname(__FILE__), "public", "image_cache", ("%02d" % zoomlevel), "#{bbox}.png")
 	FileUtils.mkdir_p(File.dirname(filename))
 	canvas = Magick::Image.new(opts[:width], opts[:height]) { self.background_color = opts[:background] }
 	gc = Magick::Draw.new
@@ -141,7 +154,7 @@ def generate_image(bbox, o={})
 	x_factor = opts[:width]/ (bbox2[1]-bbox1[1])
 	y_factor = opts[:height] / (bbox2[0]-bbox1[0])
 	
-	conditions = ["accuracy<#{$config["map"]["max_accuracy"]}", "latitude>=#{min_lat}", "latitude<=#{max_lat}", "longitude>=#{min_lon}", "longitude<=#{max_lon}"]
+	conditions = ["accuracy<=#{$config["map"]["max_accuracy"]}", "latitude>=#{min_lat}", "latitude<=#{max_lat}", "longitude>=#{min_lon}", "longitude<=#{max_lon}"]
 	conditions = conditions + opts[:additional_conditions]
 
 	if opts[:use_cached_version]
@@ -272,10 +285,3 @@ if defined?(::Sinatra) && defined?(::Sinatra::Base)
 	end
 end
 
-
-
-def merctolatlon(x, y)
-	lon = (x / 6378137.0) / Math::PI * 180
-	lat = Math::atan(Math::sinh(y / 6378137.0)) / Math::PI * 180
-	return [lat, lon]
-end
