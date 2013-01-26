@@ -19,16 +19,6 @@
 			var layer_old = new OpenLayers.Layer.WMS("Geoloqi-Overlay, alle Daten", "<%= url("/wms") %>", {transparent: true, type: 'all'}, {maxExtent: imagebounds});
 			var layer_new = new OpenLayers.Layer.WMS("Geoloqi-Overlay, neue Daten", "<%= url("/wms") %>", {transparent: true, type: 'new'}, {maxExtent: imagebounds});
 			
-			map.events.register("click", map, function(event) {
-				var coords1 = map.getLonLatFromViewPortPx(new OpenLayers.Pixel(event.xy.x-5, event.xy.y-5));
-				var coords2 = map.getLonLatFromViewPortPx(new OpenLayers.Pixel(event.xy.x+5, event.xy.y+5));
-				$.get('<%= url("/tripinfo") %>', {lat1: coords1.lat, lon1: coords1.lon, lat2: coords2.lat, lon2: coords2.lon}, function(data) {
-					//debugger
-				});
-				popup = new OpenLayers.Popup(null, coords, new OpenLayers.Size(200, 200), "bli bla blubb", true);
-				map.addPopup(popup);
-			});
-			
 			map.addLayer(layer_old);
 			map.addLayer(layer_new);
 			map.zoomToExtent(imagebounds);
