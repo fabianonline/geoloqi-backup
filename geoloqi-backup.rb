@@ -302,6 +302,11 @@ nagios if opt["nagios"]
 ##########################################
 
 if defined?(::Sinatra) && defined?(::Sinatra::Base)
+	#enable :logging
+	#log = File.new("log.log", "a")
+	#STDOUT.reopen(log)
+	#STDERR.reopen(log)
+
 	before do
 		ActiveRecord::Base.connection.verify!
 	end
