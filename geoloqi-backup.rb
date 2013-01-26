@@ -6,8 +6,10 @@ require 'yaml'
 require 'geoloqi'
 require 'getopt/long'
 require 'RMagick'
+require 'fileutils'
 
 $config = YAML.load_file("#{File.dirname((File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))}/config.yml")
+$stdout.sync = true
 
 GEOLOQI_VERSION="0.2"
 DEBUG_GENERATE_IMAGE_TIMES=false
@@ -109,13 +111,65 @@ def update
 			:sort => :asc
 		)
 		if response.empty? || response[:points].empty?
-			puts "Empty result. Exiting."
+			if $verbose
+				puts "Empty result. Exiting."
+			else
+				puts "   0 |"
+			end
 			return
 		end
-
-		puts "Got #{response[:points].count} results. Adding to database..."
+		
+		lat_min = lat_max = lon_min = lon_max = nil
+		if $verbose
+			puts "Got #{response[:points].count} results. Adding to database..."
+		else
+			print "%4d | " % response[:points].count
+		end
+		start = Time.now.to_f
 		Entry.add_multiple_points(response[:points])
-		puts ""
+		diff = Time.now.to_f - start
+		if $verbose
+			puts "(took %.3f seconds)." % diff
+		else
+			print "%7.3f sec | " % diff
+		end
+		puts "Checking boundaries..." if $verbose
+		response[:points].each do |point|
+			lat_min = point[:location][:position][:latitude] if lat_min==nil || lat_min > point[:location][:position][:latitude]
+			lat_max = point[:location][:position][:latitude] if lat_max==nil || lat_max < point[:location][:position][:latitude]
+			lon_min = point[:location][:position][:longitude] if lon_min==nil || lon_min > point[:location][:position][:longitude]
+			lon_max = point[:location][:position][:longitude] if lon_max==nil || lon_max < point[:location][:position][:longitude]
+		end
+		puts "    #{lat_min}, #{lon_min}  x  #{lat_max}, #{lon_max}" if $verbose
+		min_x, min_y = *latlontomerc(lon_min, lat_min)
+		max_x, max_y = *latlontomerc(lon_max, lat_max)
+		puts "    #{min_y}, #{min_x}  x  #{max_y}, #{max_x}" if $verbose
+		
+		print "Searching for updateable images in the cache..." if $verbose
+		all_files = Dir.glob(File.join(File.dirname(__FILE__), "public", "image_cache", "*", "*,*.png"))
+
+		matches = all_files.select{|file| f = File.basename(file).slice(0..-5).split(",").collect(&:to_f); ((f[0]<=min_x && f[2]>=min_x) || (f[2]>=max_x && f[0]<=max_x)) && ((f[1]<=min_y && f[3]>=min_y) || (f[3]>=max_y && f[1]<=max_y))}
+		if $verbose
+			puts " Found #{matches.count} images."
+		else
+			print "%4d | " % matches.count
+		end
+		puts "    Updating..." if $verbose
+		print "    " if $verbose
+		start = Time.now.to_f		
+		matches.each do |file|
+			file = File.basename(file).slice(0..-5)
+			generate_image(file, :color=>'#999')
+			print "." if $verbose
+		end
+		diff = Time.now.to_f - start
+		if $verbose
+			puts " (took %.3f seconds)." % diff
+		else
+			print "%7.3f sec | " % diff
+		end
+		puts
+		return
 	end while true
 end
 
@@ -197,6 +251,7 @@ def generate_image(bbox, o={})
 	image = canvas.to_blob {self.format="png"}
 	
 	if opts[:save_in_cache]
+		print " saving."
 		File.open(filename, "w") {|f| f.write(image) } rescue nil
 	end
 	puts
