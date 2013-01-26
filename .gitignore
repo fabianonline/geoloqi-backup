@@ -1,6 +1,5 @@
 config.yml
-log.log
+log.log*
 .htaccess
 tmp/*
 public/image_cache/*
-
