@@ -243,7 +243,6 @@ def generate_image(bbox, o={})
 		else
 			gc.point(x,y)
 		end
-		print "."
 	end
 	values << (Time.now.to_f - start) if DEBUG_GENERATE_IMAGE_TIMES && !first
 
@@ -251,7 +250,6 @@ def generate_image(bbox, o={})
 	image = canvas.to_blob {self.format="png"}
 	
 	if opts[:save_in_cache]
-		print " saving."
 		File.open(filename, "w") {|f| f.write(image) } rescue nil
 	end
 	puts
